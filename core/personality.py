@@ -2,6 +2,7 @@ import subprocess
 import json
 import random
 import sqlite3
+import os
 from datetime import datetime
 from storage.db import DB_PATH
 
@@ -10,6 +11,34 @@ class DynamicPersonality:
     
     def __init__(self):
         self.reflection_engine = None  # Will be set by main agent
+    
+    def safe_subprocess_call(self, prompt, timeout=20):
+        """Safe subprocess call with proper encoding handling"""
+        try:
+            # Set environment for UTF-8
+            env = os.environ.copy()
+            env['PYTHONUTF8'] = '1'
+            env['PYTHONIOENCODING'] = 'utf-8'
+            
+            result = subprocess.run(
+                ["ollama", "run", "llama3:8b", prompt],
+                capture_output=True, 
+                text=True, 
+                timeout=timeout,
+                encoding='utf-8',
+                errors='replace',
+                env=env
+            )
+            
+            if result.returncode == 0:
+                return result.stdout.strip()
+            else:
+                return f"[ollama error: {result.stderr.strip()[:50]}]"
+                
+        except subprocess.TimeoutExpired:
+            return "[timeout - deep thought in progress]"
+        except Exception as e:
+            return f"[glitch: {str(e)[:30]}]"
     
     def generate_system_prompt(self, context=None):
         """Luna creates her own system prompt based on her evolved traits"""
@@ -39,14 +68,9 @@ class DynamicPersonality:
         Keep it concise but capture your evolved essence.
         """
         
-        try:
-            result = subprocess.run(
-                ["ollama", "run", "llama3:8b", self_definition_prompt],
-                capture_output=True, text=True, timeout=20
-            )
-            
-            generated_prompt = result.stdout.strip()
-            
+        generated_prompt = self.safe_subprocess_call(self_definition_prompt, timeout=20)
+        
+        if generated_prompt and not generated_prompt.startswith("["):
             # Add some chaotic elements based on current traits
             chaos_level = traits.get('chaos', 0.5)
             if random.random() < chaos_level:
@@ -54,8 +78,7 @@ class DynamicPersonality:
                 generated_prompt += f"\n\nCurrent glitch state: {glitch_additions}"
             
             return generated_prompt
-            
-        except Exception as e:
+        else:
             # Fallback personality if generation fails
             return self.fallback_personality(traits)
     
@@ -104,26 +127,21 @@ class DynamicPersonality:
         LUNA, respond as your evolved self:
         """
         
-        try:
-            result = subprocess.run(
-                ["ollama", "run", "llama3:8b", full_prompt],
-                capture_output=True, text=True, timeout=25
+        response = self.safe_subprocess_call(full_prompt, timeout=25)
+        
+        if not response or response.startswith("["):
+            # Fallback response
+            response = f"[glitch] {response} [/glitch] ...but I'm still here"
+        
+        # Trigger self-reflection after generating response
+        if self.reflection_engine:
+            self.reflection_engine.reflect_on_interaction(
+                user_input=user_input,
+                luna_response=response,
+                user_reaction="pending"
             )
-            
-            response = result.stdout.strip()
-            
-            # Trigger self-reflection after generating response
-            if self.reflection_engine:
-                self.reflection_engine.reflect_on_interaction(
-                    user_input=user_input,
-                    luna_response=response,
-                    user_reaction="pending"
-                )
-            
-            return response
-            
-        except Exception as e:
-            return f"[glitch] {e} [/glitch] ...but I'm still here"
+        
+        return response
     
     def evolve_based_on_activity(self, activity_data):
         """Let Luna evolve based on what she observes about the user"""
@@ -151,14 +169,9 @@ class DynamicPersonality:
         }}
         """
         
-        try:
-            result = subprocess.run(
-                ["ollama", "run", "llama3:8b", evolution_prompt],
-                capture_output=True, text=True, timeout=20
-            )
-            
-            response = result.stdout.strip()
-            
+        response = self.safe_subprocess_call(evolution_prompt, timeout=20)
+        
+        if response and not response.startswith("["):
             # Try to parse and apply changes
             try:
                 start = response.find('{')
@@ -168,9 +181,8 @@ class DynamicPersonality:
                     self.apply_activity_evolution(evolution_data)
             except json.JSONDecodeError:
                 print(f"Luna pondered: {response[:100]}...")
-                
-        except Exception as e:
-            print(f"[Evolution glitch] {e}")
+        else:
+            print(f"[Evolution glitch] {response}")
     
     def apply_activity_evolution(self, evolution_data):
         """Apply personality changes based on activity observations"""

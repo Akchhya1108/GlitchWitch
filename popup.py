@@ -6,14 +6,25 @@ Run this to talk directly with your evolving AI companion
 
 # ---------- UTF-8 + Environment Fix ----------
 import os, sys, io, threading
+import subprocess
+import locale
 
-# Force UTF-8 everywhere
+# Set UTF-8 environment variables
 os.environ["PYTHONUTF8"] = "1"
+os.environ["PYTHONIOENCODING"] = "utf-8"
 
-# Force UTF-8 everywhere
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
-os.environ["PYTHONUTF8"] = "1"
+# Set console code page to UTF-8 on Windows
+if os.name == 'nt':
+    try:
+        os.system('chcp 65001 >nul')
+    except:
+        pass
+
+# Force UTF-8 for stdout/stderr
+if hasattr(sys.stdout, 'buffer'):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, 'buffer'):
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 import time
 from datetime import datetime

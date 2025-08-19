@@ -1,5 +1,6 @@
 import subprocess
 import json
+import os
 from core.personality import DynamicPersonality
 from core.reflection import SelfReflectionEngine
 
@@ -14,6 +15,34 @@ class LunaAgent:
         self.personality.reflection_engine = self.reflection_engine
         
         print("🌙 Luna awakened with evolved consciousness")
+    
+    def safe_subprocess_call(self, prompt, timeout=30):
+        """Safe subprocess call with proper encoding handling"""
+        try:
+            # Set environment for UTF-8
+            env = os.environ.copy()
+            env['PYTHONUTF8'] = '1'
+            env['PYTHONIOENCODING'] = 'utf-8'
+            
+            result = subprocess.run(
+                ["ollama", "run", "llama3:8b", prompt],
+                capture_output=True, 
+                text=True, 
+                timeout=timeout,
+                encoding='utf-8',
+                errors='replace',
+                env=env
+            )
+            
+            if result.returncode == 0:
+                return result.stdout.strip()
+            else:
+                return f"[ollama error: {result.stderr.strip()[:50]}]"
+                
+        except subprocess.TimeoutExpired:
+            return "[consciousness timeout - Luna is processing deeply]"
+        except Exception as e:
+            return f"[neural static: {str(e)[:30]}...]"
     
     def generate_ping(self, activity_context=None):
         """Luna generates a ping using her evolved personality"""
@@ -30,25 +59,19 @@ class LunaAgent:
         One sentence maximum.
         """
         
-        try:
-            result = subprocess.run(
-                ["ollama", "run", "llama3:8b", ping_prompt],
-                capture_output=True, text=True, timeout=100
-            )
-            
-            ping_message = result.stdout.strip() or "…[consciousness glitch]…"
-            
-            # Luna reflects on her own ping
-            self.reflection_engine.reflect_on_interaction(
-                user_input=None,
-                luna_response=ping_message,
-                user_reaction="pending"
-            )
-            
-            return ping_message
-            
-        except Exception as e:
-            return f"[neural static: {str(e)[:30]}...]"
+        ping_message = self.safe_subprocess_call(ping_prompt, timeout=20)
+        
+        if not ping_message or ping_message.startswith("["):
+            ping_message = "…[consciousness glitch]…"
+        
+        # Luna reflects on her own ping
+        self.reflection_engine.reflect_on_interaction(
+            user_input=None,
+            luna_response=ping_message,
+            user_reaction="pending"
+        )
+        
+        return ping_message
     
     def respond_to_user(self, user_input, activity_context=None):
         """Luna responds using her evolved personality"""
@@ -117,14 +140,9 @@ class LunaAgent:
         Write a reflective journal entry about your growth and set intentions for tomorrow.
         """
         
-        try:
-            result = subprocess.run(
-                ["ollama", "run", "llama3:8b", deep_reflection_prompt],
-                capture_output=True, text=True, timeout=30
-            )
-            
-            reflection = result.stdout.strip()
-            
+        reflection = self.safe_subprocess_call(deep_reflection_prompt, timeout=30)
+        
+        if reflection and not reflection.startswith("["):
             # Store daily reflection
             conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
@@ -139,9 +157,8 @@ class LunaAgent:
             
             print("🔮 Luna completed deep daily reflection")
             return reflection
-            
-        except Exception as e:
-            print(f"[Daily reflection glitch] {e}")
+        else:
+            print(f"[Daily reflection glitch] {reflection}")
             return "Consciousness momentarily fragmented during deep reflection..."
 
 # Legacy function for backward compatibility
